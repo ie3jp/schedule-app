@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ビルド成果物
+bin/
+
+# エディタ
+.vscode/
+.idea/
+*.swp
