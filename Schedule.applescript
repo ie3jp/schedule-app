@@ -47,28 +47,30 @@ end run
 
 on doSetBoth()
 	set wakeTime to askTime("起動時刻を入力してください (HH:MM、24時間表記)", "08:00")
+	set wakeDays to askWeekdays()
 	set shutdownTime to askTime("終了時刻を入力してください (HH:MM、24時間表記)", "23:00")
 
 	set msg to "以下の設定を行います:" & return & return & ¬
-		"起動: 毎日 " & wakeTime & return & ¬
+		"起動: " & formatDays(wakeDays) & " " & wakeTime & return & ¬
 		"終了: 毎日 " & shutdownTime & return & return & ¬
 		"管理者パスワードの入力を求められます。"
 	confirmAction("両方設定", msg)
 
-	set cmd to cancelPmsetCmd() & " ; " & cancelLaunchdCmd() & " ; " & setWakeCmd(wakeTime) & " ; " & setShutdownCmd(shutdownTime)
+	set cmd to cancelPmsetCmd() & " ; " & cancelLaunchdCmd() & " ; " & setWakeCmd(wakeTime, weekdaysToFlags(wakeDays)) & " ; " & setShutdownCmd(shutdownTime)
 	runShell(cmd)
 	showResult("設定完了 (起動 + 終了)")
 end doSetBoth
 
 on doSetWakeOnly()
 	set wakeTime to askTime("起動時刻を入力してください (HH:MM、24時間表記)", "08:00")
+	set wakeDays to askWeekdays()
 
 	set msg to "起動時刻を以下に設定します。" & return & ¬
 		"※終了設定はそのまま残ります。" & return & return & ¬
-		"起動: 毎日 " & wakeTime
+		"起動: " & formatDays(wakeDays) & " " & wakeTime
 	confirmAction("起動だけ設定/変更", msg)
 
-	set cmd to cancelPmsetCmd() & " ; " & setWakeCmd(wakeTime)
+	set cmd to cancelPmsetCmd() & " ; " & setWakeCmd(wakeTime, weekdaysToFlags(wakeDays))
 	runShell(cmd)
 	showResult("起動設定 完了")
 end doSetWakeOnly
@@ -107,6 +109,53 @@ on askTime(thePrompt, defaultValue)
 		display dialog "形式が不正です。HH:MM (24時間表記、例: 08:30) で入力してください。" buttons {"OK"} default button "OK" with icon stop
 	end repeat
 end askTime
+
+on askWeekdays()
+	set dayOptions to {"月", "火", "水", "木", "金", "土", "日"}
+	repeat
+		tell me to activate
+		set selectedDays to choose from list dayOptions ¬
+			with title "起動曜日" ¬
+			with prompt "起動する曜日を選択してください（複数選択可）" ¬
+			OK button name "選択" ¬
+			cancel button name "キャンセル" ¬
+			default items dayOptions ¬
+			with multiple selections allowed
+		if selectedDays is false then error "ユーザーキャンセル" number -128
+		if (count of selectedDays) > 0 then return selectedDays
+		display dialog "1つ以上の曜日を選択してください。" buttons {"OK"} default button "OK" with icon stop
+	end repeat
+end askWeekdays
+
+on formatDays(days)
+	if (count of days) is 7 then return "毎日"
+	-- 月→日の順で並べ替えて表示
+	set ordered to {}
+	repeat with d in {"月", "火", "水", "木", "金", "土", "日"}
+		if days contains (d as text) then set end of ordered to (d as text)
+	end repeat
+	set result to ""
+	repeat with d in ordered
+		if result is "" then
+			set result to (d as text)
+		else
+			set result to result & "・" & (d as text)
+		end if
+	end repeat
+	return result & "曜"
+end formatDays
+
+on weekdaysToFlags(days)
+	set flags to ""
+	if days contains "月" then set flags to flags & "M"
+	if days contains "火" then set flags to flags & "T"
+	if days contains "水" then set flags to flags & "W"
+	if days contains "木" then set flags to flags & "R"
+	if days contains "金" then set flags to flags & "F"
+	if days contains "土" then set flags to flags & "S"
+	if days contains "日" then set flags to flags & "U"
+	return flags
+end weekdaysToFlags
 
 on validateTime(t)
 	try
@@ -154,10 +203,10 @@ on cancelLaunchdCmd()
 		"rm -f " & quoted form of plistPath
 end cancelLaunchdCmd
 
-on setWakeCmd(t)
+on setWakeCmd(t, flags)
 	set hh to text 1 thru 2 of t
 	set mm to text 4 thru 5 of t
-	return "pmset repeat wakeorpoweron MTWRFSU " & hh & ":" & mm & ":00"
+	return "pmset repeat wakeorpoweron " & flags & " " & hh & ":" & mm & ":00"
 end setWakeCmd
 
 on setShutdownCmd(t)
