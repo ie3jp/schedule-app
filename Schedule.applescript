@@ -147,7 +147,11 @@ on cancelPmsetCmd()
 end cancelPmsetCmd
 
 on cancelLaunchdCmd()
-	return "launchctl bootout system " & quoted form of plistPath & " 2>/dev/null || true ; rm -f " & quoted form of plistPath
+	-- bootout は非同期完了。ジョブが消えてから rm しないと、後続の bootstrap が
+	-- "already loaded" で失敗することがある。最大2秒待ってから plist 削除。
+	return "launchctl bootout system " & quoted form of plistPath & " 2>/dev/null ; " & ¬
+		"for i in 1 2 3 4 5 6 7 8 9 10; do launchctl print system/" & plistLabel & " >/dev/null 2>&1 || break; sleep 0.2; done ; " & ¬
+		"rm -f " & quoted form of plistPath
 end cancelLaunchdCmd
 
 on setWakeCmd(t)
